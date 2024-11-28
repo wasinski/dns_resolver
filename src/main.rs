@@ -30,6 +30,19 @@ impl DnsHeader {
             num_additionals: 0,
         }
     }
+    fn new_from_bytes(b: &[u8]) -> Self {
+        if b.len() < 12 {
+            panic!("given bytes are two short to unpack a 12bytes struct")
+        }
+        Self {
+            id: u16::from_be_bytes(b[0..2].try_into().unwrap()),
+            flags: u16::from_be_bytes(b[2..4].try_into().unwrap()),
+            num_questions: u16::from_be_bytes(b[4..6].try_into().unwrap()),
+            num_answers: u16::from_be_bytes(b[6..8].try_into().unwrap()),
+            num_authorities: u16::from_be_bytes(b[8..10].try_into().unwrap()),
+            num_additionals: u16::from_be_bytes(b[10..12].try_into().unwrap()),
+        }
+    }
 
     fn encode(self) -> Vec<u8> {
         let mut buffer = vec![];
@@ -107,6 +120,20 @@ fn build_query(name: &str) -> Vec<u8> {
     buffer.extend(question.encode());
 
     buffer
+}
+
+struct DnsRecord {
+    name: Vec<u8>,
+    rtype: u16,
+    rclass: u16,
+    ttl: u16,
+    data: Vec<u8>,
+}
+
+impl DnsRecord {
+    fn from_bytes(b: &[u8]) -> Self {
+        todo!()
+    }
 }
 
 fn main() {
