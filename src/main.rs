@@ -59,15 +59,18 @@ impl DnsHeader {
 }
 
 #[derive(Debug)]
-struct DnsName(Vec<u8>);
+struct DnsName(String);
 
 impl DnsName {
-    fn encoded_from_string(s: &str) -> Self {
+    fn new(s: &str) -> Self {
         assert!(
             s.is_ascii(),
             "dns name must not contain non-ascii characters"
         );
+        Self(s.to_string())
+    }
 
+    fn encode(self) -> Vec<u8> {
         let mut encoded = vec![];
         for label in s.split(".") {
             assert!(
@@ -80,7 +83,7 @@ impl DnsName {
         }
         encoded.push(0);
 
-        Self(encoded)
+        encoded
     }
 }
 
@@ -92,7 +95,7 @@ struct DnsQuestion {
 
 impl DnsQuestion {
     fn new_for_name(name: &str) -> Self {
-        let name = DnsName::encoded_from_string(name);
+        let name = DnsName::new(name);
 
         Self {
             name,
@@ -104,7 +107,7 @@ impl DnsQuestion {
     fn encode(self) -> Vec<u8> {
         let mut buffer = vec![];
 
-        buffer.extend(self.name.0);
+        buffer.extend(self.name.encode());
         buffer.extend(self.qtype.to_be_bytes());
         buffer.extend(self.qclass.to_be_bytes());
 
