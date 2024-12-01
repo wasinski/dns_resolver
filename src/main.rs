@@ -2,6 +2,7 @@ use rand::Rng;
 use std::env;
 use std::io::Read;
 use std::net::UdpSocket;
+use std::ops::BitAndAssign;
 
 #[derive(Debug)]
 struct DnsHeader {
@@ -30,7 +31,7 @@ impl DnsHeader {
             num_additionals: 0,
         }
     }
-    fn new_from_bytes(b: &[u8]) -> Self {
+    fn decode(b: &[u8]) -> Self {
         if b.len() < 12 {
             panic!("given bytes are two short to unpack a 12bytes struct")
         }
@@ -58,6 +59,31 @@ impl DnsHeader {
     }
 }
 
+struct Reader<'a> {
+    buf: &'a [u8],
+    pos: usize,
+    len: usize,
+}
+
+impl Reader<'_> {
+    fn read(&mut self, len: usize) -> &[u8] {
+        assert!(self.pos + len < self.len);
+        let r = &self.buf[self.pos..self.pos + len];
+        self.pos += len;
+
+        r
+    }
+
+    fn seek(&mut self, pos: usize) {
+        assert!(pos < self.len);
+        self.len = pos;
+    }
+
+    fn tell(&self) -> usize {
+        self.pos
+    }
+}
+
 #[derive(Debug)]
 struct DnsName(String);
 
@@ -70,9 +96,43 @@ impl DnsName {
         Self(s.to_string())
     }
 
+    fn decode(r: &mut Reader) -> Self {
+        Self::new(&Self::decode_name(r))
+    }
+    fn decode_name(r: &mut Reader) -> String {
+        let mut parts: Vec<String> = vec![];
+        loop {
+            let len = r.read(1)[0];
+            if len == 0 {
+                break;
+            }
+            if (len & 0b1100_0000) != 0 {
+                parts.push(DnsName::decode_compressed_name(len, r));
+                break;
+            } else {
+                let part = String::from_utf8(r.read(len as usize).to_vec()).unwrap();
+                parts.push(part);
+            };
+        }
+
+        parts.join(".")
+    }
+
+    fn decode_compressed_name(len: u8, r: &mut Reader) -> String {
+        let pointer_bytes = [(len & 0b0011_1111), r.read(1)[0]];
+        let pointer = u16::from_be_bytes(pointer_bytes);
+
+        let current_pos = r.tell();
+        r.seek(pointer as usize);
+        let result = DnsName::decode_name(r);
+        r.seek(current_pos);
+
+        result
+    }
+
     fn encode(self) -> Vec<u8> {
         let mut encoded = vec![];
-        for label in s.split(".") {
+        for label in self.0.split(".") {
             assert!(
                 0 < label.len() && label.len() <= 64,
                 "dns label not in len range"
@@ -126,7 +186,7 @@ fn build_query(name: &str) -> Vec<u8> {
 }
 
 struct DnsRecord {
-    name: Vec<u8>,
+    name: DnsName,
     rtype: u16,
     rclass: u16,
     ttl: u16,
@@ -134,8 +194,24 @@ struct DnsRecord {
 }
 
 impl DnsRecord {
-    fn from_bytes(b: &[u8]) -> Self {
-        todo!()
+    fn decode(r: &mut Reader) -> Self {
+        let name = DnsName::decode(r);
+        let b = r.read(10);
+
+        let rtype = u16::from_be_bytes(b[0..2].try_into().unwrap());
+        let rclass = u16::from_be_bytes(b[2..4].try_into().unwrap());
+        let ttl = u16::from_be_bytes(b[4..6].try_into().unwrap());
+        let data_len = u32::from_be_bytes(b[6..10].try_into().unwrap());
+
+        let data = r.read(data_len as usize).to_vec();
+
+        Self {
+            name,
+            rtype,
+            rclass,
+            ttl,
+            data,
+        }
     }
 }
 
