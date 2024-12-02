@@ -234,6 +234,41 @@ impl DnsRecord {
     }
 }
 
+#[derive(Debug)]
+struct DnsPacket {
+    header: DnsHeader,
+    questions: Vec<DnsQuestion>,
+    answers: Vec<DnsRecord>,
+    authorities: Vec<DnsRecord>,
+    additionals: Vec<DnsRecord>,
+}
+
+impl DnsPacket {
+    fn decode(r: &mut Reader) -> Self {
+        let header = DnsHeader::decode(r);
+        let questions = (0..header.num_questions)
+            .map(|_| DnsQuestion::decode(r))
+            .collect();
+        let answers = (0..header.num_answers)
+            .map(|_| DnsRecord::decode(r))
+            .collect();
+        let authorities = (0..header.num_authorities)
+            .map(|_| DnsRecord::decode(r))
+            .collect();
+        let additionals = (0..header.num_additionals)
+            .map(|_| DnsRecord::decode(r))
+            .collect();
+
+        Self {
+            header,
+            questions,
+            answers,
+            authorities,
+            additionals,
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -243,14 +278,7 @@ fn main() {
     };
 
     let dns_query = build_query(&domain_name);
-    println!(
-        "DNS Query (hex): {}",
-        dns_query
-            .iter()
-            .map(|byte| format!("{:02x}", byte))
-            .collect::<Vec<_>>()
-            .join(" ")
-    );
+
     let socket = UdpSocket::bind("0.0.0.0:0").expect("could not bind socket");
     socket
         .connect("8.8.8.8:53")
@@ -267,7 +295,7 @@ fn main() {
 
     let mut reader = Reader::new(&recv_buffer, recv_size);
 
-    let header = DnsHeader::decode(&mut reader);
-    let question = DnsQuestion::decode(&mut reader);
-    let record = DnsRecord::decode(&mut reader);
+    let packet = DnsPacket::decode(&mut reader);
+
+    dbg!(&packet);
 }
