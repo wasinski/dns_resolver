@@ -1,8 +1,6 @@
 use rand::Rng;
 use std::env;
-use std::io::Read;
 use std::net::UdpSocket;
-use std::ops::BitAndAssign;
 
 #[derive(Debug)]
 struct DnsHeader {
@@ -31,10 +29,9 @@ impl DnsHeader {
             num_additionals: 0,
         }
     }
-    fn decode(b: &[u8]) -> Self {
-        if b.len() < 12 {
-            panic!("given bytes are two short to unpack a 12bytes struct")
-        }
+
+    fn decode(r: &mut Reader) -> Self {
+        let b = r.read(12);
         Self {
             id: u16::from_be_bytes(b[0..2].try_into().unwrap()),
             flags: u16::from_be_bytes(b[2..4].try_into().unwrap()),
@@ -66,11 +63,21 @@ struct Reader<'a> {
 }
 
 impl Reader<'_> {
+    fn new<'a>(buf: &'a [u8], len: usize) -> Reader<'a> {
+        return Reader { buf, pos: 0, len };
+    }
+
     fn read(&mut self, len: usize) -> &[u8] {
-        assert!(self.pos + len < self.len);
+        assert!(
+            self.pos + len < self.len,
+            "limit len: {}, pos: {}, new pos: {}",
+            self.len,
+            self.pos,
+            self.pos + len
+        );
         let r = &self.buf[self.pos..self.pos + len];
         self.pos += len;
-
+        dbg!(&r);
         r
     }
 
@@ -137,7 +144,7 @@ impl DnsName {
                 0 < label.len() && label.len() <= 64,
                 "dns label not in len range"
             );
-            encoded.push(0);
+            // encoded.push(0);
             encoded.push(label.len() as u8);
             encoded.extend_from_slice(label.as_bytes());
         }
@@ -147,6 +154,7 @@ impl DnsName {
     }
 }
 
+#[derive(Debug)]
 struct DnsQuestion {
     name: DnsName,
     qtype: u16,
@@ -161,6 +169,17 @@ impl DnsQuestion {
             name,
             qtype: 1,  // TYPE_A IPv4
             qclass: 1, // CLASS_IN Internet
+        }
+    }
+
+    fn decode(r: &mut Reader) -> Self {
+        let name = DnsName::decode(r);
+        let b = r.read(4);
+
+        Self {
+            name,
+            qtype: u16::from_be_bytes(b[0..2].try_into().unwrap()),
+            qclass: u16::from_be_bytes(b[2..4].try_into().unwrap()),
         }
     }
 
@@ -185,6 +204,7 @@ fn build_query(name: &str) -> Vec<u8> {
     buffer
 }
 
+#[derive(Debug)]
 struct DnsRecord {
     name: DnsName,
     rtype: u16,
@@ -232,19 +252,25 @@ fn main() {
             .collect::<Vec<_>>()
             .join(" ")
     );
-    // let socket = UdpSocket::bind("0.0.0.0:0").expect("could not bind socket");
-    // socket
-    //     .connect("8.8.8.8:53")
-    //     .expect("could not connect to DNS");
+    let socket = UdpSocket::bind("0.0.0.0:0").expect("could not bind socket");
+    socket
+        .connect("8.8.8.8:53")
+        .expect("could not connect to DNS");
 
-    // socket
-    //     .send(&dns_query)
-    //     .expect("error on sending query to DNS");
+    socket
+        .send(&dns_query)
+        .expect("error on sending query to DNS");
 
-    // let mut recv_buffer = [0 as u8; 512];
-    // let recv_size = socket
-    //     .recv(&mut recv_buffer)
-    //     .expect("error on response receiving.");
+    let mut recv_buffer = [0 as u8; 512];
+    let recv_size = socket
+        .recv(&mut recv_buffer)
+        .expect("error on response receiving.");
 
-    // dbg!(&recv_buffer[..recv_size]);
+    let mut reader = Reader::new(&recv_buffer, recv_size);
+    let header = DnsHeader::decode(&mut reader);
+    dbg!(&header);
+    let question = DnsQuestion::decode(&mut reader);
+    dbg!(&question);
+    let record = DnsRecord::decode(&mut reader);
+    dbg!(&record);
 }
