@@ -69,7 +69,7 @@ impl Reader<'_> {
 
     fn read(&mut self, len: usize) -> &[u8] {
         assert!(
-            self.pos + len < self.len,
+            self.pos < self.len && self.pos + len <= self.len,
             "limit len: {}, pos: {}, new pos: {}",
             self.len,
             self.pos,
@@ -77,13 +77,13 @@ impl Reader<'_> {
         );
         let r = &self.buf[self.pos..self.pos + len];
         self.pos += len;
-        dbg!(&r);
+
         r
     }
 
     fn seek(&mut self, pos: usize) {
         assert!(pos < self.len);
-        self.len = pos;
+        self.pos = pos;
     }
 
     fn tell(&self) -> usize {
@@ -209,7 +209,7 @@ struct DnsRecord {
     name: DnsName,
     rtype: u16,
     rclass: u16,
-    ttl: u16,
+    ttl: u32,
     data: Vec<u8>,
 }
 
@@ -220,9 +220,8 @@ impl DnsRecord {
 
         let rtype = u16::from_be_bytes(b[0..2].try_into().unwrap());
         let rclass = u16::from_be_bytes(b[2..4].try_into().unwrap());
-        let ttl = u16::from_be_bytes(b[4..6].try_into().unwrap());
-        let data_len = u32::from_be_bytes(b[6..10].try_into().unwrap());
-
+        let ttl = u32::from_be_bytes(b[4..8].try_into().unwrap());
+        let data_len = u16::from_be_bytes(b[8..10].try_into().unwrap());
         let data = r.read(data_len as usize).to_vec();
 
         Self {
@@ -267,10 +266,8 @@ fn main() {
         .expect("error on response receiving.");
 
     let mut reader = Reader::new(&recv_buffer, recv_size);
+
     let header = DnsHeader::decode(&mut reader);
-    dbg!(&header);
     let question = DnsQuestion::decode(&mut reader);
-    dbg!(&question);
     let record = DnsRecord::decode(&mut reader);
-    dbg!(&record);
 }
