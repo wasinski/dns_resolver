@@ -63,8 +63,8 @@ struct Reader<'a> {
 }
 
 impl Reader<'_> {
-    fn new<'a>(buf: &'a [u8], len: usize) -> Reader<'a> {
-        return Reader { buf, pos: 0, len };
+    fn new(buf: &[u8], len: usize) -> Reader<'_> {
+        Reader { buf, pos: 0, len }
     }
 
     fn read(&mut self, len: usize) -> &[u8] {
@@ -141,10 +141,10 @@ impl DnsName {
 
     fn encode(self) -> Vec<u8> {
         let mut encoded = vec![];
-        for label in self.0.split(".") {
+        for label in self.0.split('.') {
             assert!(
-                0 < label.len() && label.len() <= 64,
-                "dns label not in len range"
+                !label.is_empty() && label.len() <= 64,
+                "dns label must be 1 up to 64 chacters"
             );
             // encoded.push(0);
             encoded.push(label.len() as u8);
@@ -290,7 +290,7 @@ fn main() {
         .send(&dns_query)
         .expect("error on sending query to DNS");
 
-    let mut recv_buffer = [0 as u8; 512];
+    let mut recv_buffer = [0_u8; 512];
     let recv_size = socket
         .recv(&mut recv_buffer)
         .expect("error on response receiving.");
