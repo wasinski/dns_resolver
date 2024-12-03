@@ -2,6 +2,8 @@ use rand::Rng;
 use std::env;
 use std::net::UdpSocket;
 
+const TYPE_A: u16 = 1;
+
 #[derive(Debug)]
 struct DnsHeader {
     id: u16,
@@ -13,12 +15,11 @@ struct DnsHeader {
 }
 
 impl DnsHeader {
-    fn new_with_rand_id() -> Self {
+    fn new_with_rand_id(flags: u16) -> Self {
         let mut rng = rand::thread_rng();
 
         let id: u16 = rng.gen();
         let num_questions = 1;
-        let flags = 1 << 8;
 
         Self {
             id,
@@ -164,12 +165,12 @@ struct DnsQuestion {
 }
 
 impl DnsQuestion {
-    fn new_for_name(name: String) -> Self {
+    fn new_for_name(name: String, record_type: u16) -> Self {
         let name = DnsName::new(name);
 
         Self {
             name,
-            qtype: 1,  // TYPE_A IPv4
+            qtype: record_type,
             qclass: 1, // CLASS_IN Internet
         }
     }
@@ -196,10 +197,10 @@ impl DnsQuestion {
     }
 }
 
-fn build_query(name: String) -> Vec<u8> {
+fn build_query(name: String, record_type: u16, flags: u16) -> Vec<u8> {
     let mut buffer = vec![];
-    let header = DnsHeader::new_with_rand_id();
-    let question = DnsQuestion::new_for_name(name);
+    let header = DnsHeader::new_with_rand_id(flags);
+    let question = DnsQuestion::new_for_name(name, record_type);
     buffer.extend(header.encode());
     buffer.extend(question.encode());
 
@@ -269,21 +270,26 @@ impl DnsPacket {
             additionals,
         }
     }
+
+    fn parse_ip_address(&self) -> String {
+        match self.answers.get(0) {
+            Some(record) => match record.data.as_slice() {
+                [p1, p2, p3, p4] => format!("{}.{}.{}.{}", p1, p2, p3, p4),
+                _ => panic!("corrupted data"),
+            },
+            None => panic!("no answer"),
+        }
+    }
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    let domain_name = match &args.as_slice() {
-        &[_, domain_name] => domain_name.to_owned(),
-        _ => panic!("improper arguments"),
-    };
-
-    let dns_query = build_query(domain_name);
+// FIX: have a dedicated type for IP address
+fn send_query(ip_address: &str, domain_name: &str, record_type: u16) -> String {
+    // FIX think about providing here string, or having &str as build_query parameter
+    let dns_query = build_query(domain_name.to_string(), record_type, 0);
 
     let socket = UdpSocket::bind("0.0.0.0:0").expect("could not bind socket");
     socket
-        .connect("8.8.8.8:53")
+        .connect(format!("{}:53", ip_address))
         .expect("could not connect to DNS");
 
     socket
@@ -299,5 +305,18 @@ fn main() {
 
     let packet = DnsPacket::decode(&mut reader);
 
-    dbg!(&packet);
+    packet.parse_ip_address()
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let domain_name = match &args.as_slice() {
+        &[_, domain_name] => domain_name,
+        _ => panic!("improper arguments"),
+    };
+
+    let result_ip_address = send_query("8.8.8.8", domain_name, TYPE_A);
+
+    dbg!(result_ip_address);
 }
