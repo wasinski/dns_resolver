@@ -95,16 +95,18 @@ impl Reader<'_> {
 struct DnsName(String);
 
 impl DnsName {
-    fn new(s: &str) -> Self {
+    // pass a string, not a reference so the caller can decide if cloning is necessary
+    // + implement from_str maybe
+    fn new(s: String) -> Self {
         assert!(
             s.is_ascii(),
             "dns name must not contain non-ascii characters"
         );
-        Self(s.to_string())
+        Self(s)
     }
 
     fn decode(r: &mut Reader) -> Self {
-        Self::new(&Self::decode_name(r))
+        Self::new(Self::decode_name(r))
     }
     fn decode_name(r: &mut Reader) -> String {
         let mut parts: Vec<String> = vec![];
@@ -162,7 +164,7 @@ struct DnsQuestion {
 }
 
 impl DnsQuestion {
-    fn new_for_name(name: &str) -> Self {
+    fn new_for_name(name: String) -> Self {
         let name = DnsName::new(name);
 
         Self {
@@ -194,7 +196,7 @@ impl DnsQuestion {
     }
 }
 
-fn build_query(name: &str) -> Vec<u8> {
+fn build_query(name: String) -> Vec<u8> {
     let mut buffer = vec![];
     let header = DnsHeader::new_with_rand_id();
     let question = DnsQuestion::new_for_name(name);
@@ -273,11 +275,11 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let domain_name = match &args.as_slice() {
-        &[_, domain_name] => domain_name,
+        &[_, domain_name] => domain_name.to_owned(),
         _ => panic!("improper arguments"),
     };
 
-    let dns_query = build_query(&domain_name);
+    let dns_query = build_query(domain_name);
 
     let socket = UdpSocket::bind("0.0.0.0:0").expect("could not bind socket");
     socket
