@@ -5,6 +5,40 @@ use std::net::UdpSocket;
 const TYPE_A: u16 = 1;
 
 #[derive(Debug)]
+struct IPv4([u8; 4]);
+
+impl std::str::FromStr for IPv4 {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split('.').collect();
+
+        if parts.len() != 4 {
+            return Err("incorrect length of IPv4 address");
+        }
+
+        let mut octets = [0u8; 4];
+        for (i, part) in parts.iter().enumerate() {
+            octets[i] = part.parse::<u8>().map_err(|_| "Invalid octet")?;
+        }
+
+        Ok(Self(octets))
+    }
+}
+
+impl std::fmt::Display for IPv4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}.{}", self.0[0], self.0[1], self.0[2], self.0[3])
+    }
+}
+
+impl TryFrom<&str> for IPv4 {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+#[derive(Debug)]
 struct DnsHeader {
     id: u16,
     flags: u16,
@@ -271,6 +305,7 @@ impl DnsPacket {
         }
     }
 
+    // FIX: maybe make it [u8;4]?
     fn parse_ip_address(&self) -> String {
         match self.answers.get(0) {
             Some(record) => match record.data.as_slice() {
