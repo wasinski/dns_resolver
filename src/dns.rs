@@ -145,8 +145,6 @@ impl Reader<'_> {
 pub struct DnsName(String);
 
 impl DnsName {
-    // pass a string, not a reference so the caller can decide if cloning is necessary
-    // + implement from_str maybe
     fn new(s: String) -> Self {
         assert!(
             s.is_ascii(),
@@ -196,7 +194,6 @@ impl DnsName {
                 !label.is_empty() && label.len() <= 64,
                 "dns label must be 1 up to 64 chacters"
             );
-            // encoded.push(0);
             encoded.push(label.len() as u8);
             encoded.extend_from_slice(label.as_bytes());
         }
