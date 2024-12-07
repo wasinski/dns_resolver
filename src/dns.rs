@@ -1,6 +1,7 @@
 use rand::Rng;
 
 pub const TYPE_A: u16 = 1;
+pub const TYPE_NS: u16 = 2;
 
 #[derive(Debug)]
 struct IPv4([u8; 4]);
@@ -270,6 +271,53 @@ impl DnsRecord {
             ttl,
             data,
         }
+    }
+
+    fn parse(self) -> DnsRecordParsed {
+        match self.rtype {
+            TYPE_A => DnsRecordParsed::from_type_a(self),
+            TYPE_NS => DnsRecordParsed::from_type_ns(self),
+            _ => panic!("not implemented"), // have an enum here
+        }
+    }
+}
+
+enum ParsedData {
+    DomainName(DnsName),
+    IpAddr(IPv4),
+}
+
+impl ParsedData {
+    fn parse_ip_address(data: &[u8]) -> Self {
+        let mut r = Reader::new(data, data.len());
+        let n = DnsName::decode(&mut r);
+
+        Self::DomainName(n)
+    }
+
+    fn parse_domain_name(data: &[u8]) -> Self {
+        let a = IPv4(data.try_into().unwrap());
+
+        Self::IpAddr(a)
+    }
+}
+
+struct DnsRecordParsed {
+    raw: DnsRecord,
+    data: ParsedData,
+}
+
+impl DnsRecordParsed {
+    fn from_type_a(raw: DnsRecord) -> Self {
+        assert_eq!(raw.rtype, TYPE_A);
+        let data = ParsedData::parse_ip_address(&raw.data);
+        Self { raw, data }
+    }
+
+    fn from_type_ns(raw: DnsRecord) -> Self {
+        assert_eq!(raw.rtype, TYPE_NS);
+        let data = ParsedData::parse_domain_name(&raw.data);
+        Self { raw, data }
     }
 }
 
