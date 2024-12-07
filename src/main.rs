@@ -13,7 +13,7 @@ fn main() {
         _ => panic!("improper arguments"),
     };
 
-    let result_ip_address = send_query("8.8.8.8", domain_name, TYPE_A);
+    let result_ip_address = send_query("198.41.0.4", domain_name, TYPE_A);
 
     dbg!(result_ip_address);
 }

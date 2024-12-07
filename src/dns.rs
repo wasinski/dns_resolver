@@ -132,8 +132,14 @@ impl Reader<'_> {
         r
     }
 
+    fn copy(&mut self, len: usize) -> &[u8] {
+        let r = &self.buf[self.pos..self.pos + len];
+
+        r
+    }
+
     fn seek(&mut self, pos: usize) {
-        assert!(pos < self.len);
+        assert!(pos < self.len, "!{} < {}", pos, self.len);
         self.pos = pos;
     }
 
@@ -251,6 +257,7 @@ pub struct DnsRecord {
     rclass: u16,
     ttl: u32,
     data: Vec<u8>,
+    parsed_data: ParsedData,
 }
 
 impl DnsRecord {
@@ -262,62 +269,48 @@ impl DnsRecord {
         let rclass = u16::from_be_bytes(b[2..4].try_into().unwrap());
         let ttl = u32::from_be_bytes(b[4..8].try_into().unwrap());
         let data_len = u16::from_be_bytes(b[8..10].try_into().unwrap());
-        let data = r.read(data_len as usize).to_vec();
+        // let data = r.copy(data_len as usize).to_vec();
+        let data = [0_u8; 0];
+
+        let parsed_data = match rtype {
+            TYPE_A => ParsedData::parse_ip_address(r.read(data_len as usize)),
+            TYPE_NS => ParsedData::parse_domain_name(r),
+            _ => ParsedData::other(r.read(data_len as usize)), // have an enum here
+        };
 
         Self {
             name,
             rtype,
             rclass,
             ttl,
-            data,
-        }
-    }
-
-    fn parse(self) -> DnsRecordParsed {
-        match self.rtype {
-            TYPE_A => DnsRecordParsed::from_type_a(self),
-            TYPE_NS => DnsRecordParsed::from_type_ns(self),
-            _ => panic!("not implemented"), // have an enum here
+            data: data.into(),
+            parsed_data,
         }
     }
 }
 
+#[derive(Debug)]
 enum ParsedData {
     DomainName(DnsName),
     IpAddr(IPv4),
+    Other,
 }
 
 impl ParsedData {
     fn parse_ip_address(data: &[u8]) -> Self {
-        let mut r = Reader::new(data, data.len());
-        let n = DnsName::decode(&mut r);
-
-        Self::DomainName(n)
-    }
-
-    fn parse_domain_name(data: &[u8]) -> Self {
         let a = IPv4(data.try_into().unwrap());
 
         Self::IpAddr(a)
     }
-}
 
-struct DnsRecordParsed {
-    raw: DnsRecord,
-    data: ParsedData,
-}
+    fn parse_domain_name(r: &mut Reader) -> Self {
+        let n = DnsName::decode(r);
 
-impl DnsRecordParsed {
-    fn from_type_a(raw: DnsRecord) -> Self {
-        assert_eq!(raw.rtype, TYPE_A);
-        let data = ParsedData::parse_ip_address(&raw.data);
-        Self { raw, data }
+        Self::DomainName(n)
     }
 
-    fn from_type_ns(raw: DnsRecord) -> Self {
-        assert_eq!(raw.rtype, TYPE_NS);
-        let data = ParsedData::parse_domain_name(&raw.data);
-        Self { raw, data }
+    fn other(_data: &[u8]) -> Self {
+        Self::Other
     }
 }
 

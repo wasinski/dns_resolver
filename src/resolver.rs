@@ -36,5 +36,9 @@ pub fn send_query(ip_address: &str, domain_name: &str, record_type: u16) -> Stri
 
     let packet = DnsPacket::decode(&mut reader);
 
-    packet.parse_ip_address()
+    dbg!(packet);
+
+    "later".into()
+
+    // packet.parse_ip_address()
 }
