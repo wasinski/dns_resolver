@@ -4,7 +4,7 @@ pub const TYPE_A: u16 = 1;
 pub const TYPE_NS: u16 = 2;
 
 #[derive(Debug)]
-struct IPv4([u8; 4]);
+pub struct IPv4([u8; 4]);
 
 impl std::str::FromStr for IPv4 {
     type Err = &'static str;
@@ -26,7 +26,7 @@ impl std::str::FromStr for IPv4 {
 
 impl std::fmt::Display for IPv4 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}.{}.{}", self.0[0], self.0[1], self.0[2], self.0[2])
+        write!(f, "{}.{}.{}.{}", self.0[0], self.0[1], self.0[2], self.0[3])
     }
 }
 
@@ -139,7 +139,7 @@ impl Reader<'_> {
     }
 
     fn seek(&mut self, pos: usize) {
-        assert!(pos < self.len, "!{} < {}", pos, self.len);
+        assert!(pos <= self.len, "!{} <= {}", pos, self.len);
         self.pos = pos;
     }
 
@@ -318,9 +318,9 @@ impl ParsedData {
 pub struct DnsPacket {
     header: DnsHeader,
     questions: Vec<DnsQuestion>,
-    answers: Vec<DnsRecord>,
-    authorities: Vec<DnsRecord>,
-    additionals: Vec<DnsRecord>,
+    pub answers: Vec<DnsRecord>,
+    pub authorities: Vec<DnsRecord>,
+    pub additionals: Vec<DnsRecord>,
 }
 
 impl DnsPacket {
@@ -350,9 +350,32 @@ impl DnsPacket {
 
     pub fn parse_ip_address(&self) -> String {
         match self.answers.get(0) {
-            Some(record) => match record.data.as_slice() {
-                [p1, p2, p3, p4] => IPv4([*p1, *p2, *p3, *p4]).into(),
-                _ => panic!("corrupted data"),
+            Some(record) => match &record.parsed_data {
+                ParsedData::DomainName(_name) => panic!("got name, expected ip address"),
+                ParsedData::IpAddr(addr) => addr.to_string(),
+                ParsedData::Other => panic!("other unsuppored, self: {:?}", self),
+            },
+            None => panic!("no answer"),
+        }
+    }
+
+    pub fn parse_next_name_server_ip(&self) -> String {
+        match self.additionals.get(0) {
+            Some(record) => match &record.parsed_data {
+                ParsedData::DomainName(_name) => panic!("got name, expected ip address"),
+                ParsedData::IpAddr(addr) => addr.to_string(),
+                ParsedData::Other => panic!("other unsuppored"),
+            },
+            None => panic!("no answer"),
+        }
+    }
+
+    pub fn parse_next_name_server_domain(&self) -> String {
+        match self.authorities.get(0) {
+            Some(record) => match &record.parsed_data {
+                ParsedData::DomainName(name) => name.0.clone(),
+                ParsedData::IpAddr(_addr) => panic!("got addr, expected domain name"),
+                ParsedData::Other => panic!("other unsuppored"),
             },
             None => panic!("no answer"),
         }

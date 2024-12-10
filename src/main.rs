@@ -1,7 +1,7 @@
 use std::env;
 
 use crate::dns::TYPE_A;
-use crate::resolver::send_query;
+use crate::resolver::resolve;
 mod dns;
 mod resolver;
 
@@ -13,7 +13,7 @@ fn main() {
         _ => panic!("improper arguments"),
     };
 
-    let result_ip_address = send_query("198.41.0.4", domain_name, TYPE_A);
+    let result_ip_address = resolve(domain_name, TYPE_A);
 
     dbg!(result_ip_address);
 }
