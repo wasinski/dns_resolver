@@ -349,35 +349,50 @@ impl DnsPacket {
     }
 
     pub fn parse_ip_address(&self) -> String {
-        match self.answers.get(0) {
-            Some(record) => match &record.parsed_data {
-                ParsedData::DomainName(_name) => panic!("got name, expected ip address"),
-                ParsedData::IpAddr(addr) => addr.to_string(),
-                ParsedData::Other => panic!("other unsuppored, self: {:?}", self),
-            },
-            None => panic!("no answer"),
+        if let Some(record) = self
+            .answers
+            .iter()
+            .find(|r| matches!(r.parsed_data, ParsedData::IpAddr(_)))
+        {
+            if let ParsedData::IpAddr(addr) = &record.parsed_data {
+                addr.to_string()
+            } else {
+                panic!("type A record not found")
+            }
+        } else {
+            panic!("type A record not found")
         }
     }
 
     pub fn parse_next_name_server_ip(&self) -> String {
-        match self.additionals.get(0) {
-            Some(record) => match &record.parsed_data {
-                ParsedData::DomainName(_name) => panic!("got name, expected ip address"),
-                ParsedData::IpAddr(addr) => addr.to_string(),
-                ParsedData::Other => panic!("other unsuppored"),
-            },
-            None => panic!("no answer"),
+        if let Some(record) = self
+            .additionals
+            .iter()
+            .find(|r| matches!(r.parsed_data, ParsedData::IpAddr(_)))
+        {
+            if let ParsedData::IpAddr(addr) = &record.parsed_data {
+                addr.to_string()
+            } else {
+                panic!("type A record not found")
+            }
+        } else {
+            panic!("type A record not found")
         }
     }
 
     pub fn parse_next_name_server_domain(&self) -> String {
-        match self.authorities.get(0) {
-            Some(record) => match &record.parsed_data {
-                ParsedData::DomainName(name) => name.0.clone(),
-                ParsedData::IpAddr(_addr) => panic!("got addr, expected domain name"),
-                ParsedData::Other => panic!("other unsuppored"),
-            },
-            None => panic!("no answer"),
+        if let Some(record) = self
+            .authorities
+            .iter()
+            .find(|r| matches!(r.parsed_data, ParsedData::DomainName(_)))
+        {
+            if let ParsedData::DomainName(name) = &record.parsed_data {
+                name.0.clone()
+            } else {
+                panic!("type NS record not found")
+            }
+        } else {
+            panic!("type NS record not found")
         }
     }
 }
