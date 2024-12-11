@@ -30,9 +30,9 @@ impl std::fmt::Display for IPv4 {
     }
 }
 
-impl Into<String> for IPv4 {
-    fn into(self) -> String {
-        format!("{}.{}.{}.{}", self.0[0], self.0[1], self.0[2], self.0[3])
+impl From<IPv4> for String {
+    fn from(val: IPv4) -> Self {
+        format!("{}.{}.{}.{}", val.0[0], val.0[1], val.0[2], val.0[3])
     }
 }
 
@@ -128,12 +128,6 @@ impl Reader<'_> {
         );
         let r = &self.buf[self.pos..self.pos + len];
         self.pos += len;
-
-        r
-    }
-
-    fn copy(&mut self, len: usize) -> &[u8] {
-        let r = &self.buf[self.pos..self.pos + len];
 
         r
     }

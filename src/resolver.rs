@@ -1,10 +1,8 @@
 use std::net::UdpSocket;
 
 use crate::dns::DnsHeader;
-use crate::dns::DnsName;
 use crate::dns::DnsPacket;
 use crate::dns::DnsQuestion;
-use crate::dns::IPv4;
 use crate::dns::Reader;
 use crate::dns::TYPE_A;
 
@@ -46,9 +44,9 @@ pub fn send_query(ip_address: &str, domain_name: &str, record_type: u16) -> Quer
 
     let packet = DnsPacket::decode(&mut reader);
 
-    if packet.answers.len() >= 1 {
+    if !packet.answers.is_empty() {
         QueryResponse::Answer(packet.parse_ip_address())
-    } else if packet.additionals.len() >= 1 {
+    } else if !packet.additionals.is_empty() {
         QueryResponse::Additional(packet.parse_next_name_server_ip())
     } else {
         QueryResponse::Authority(packet.parse_next_name_server_domain())
@@ -61,7 +59,7 @@ pub fn resolve(domain_name: &str, record_type: u16) -> String {
         let response = send_query(&name_server, domain_name, record_type);
 
         let next_name_server = match response {
-            QueryResponse::Answer(resolved_ip_addr) => return resolved_ip_addr.into(),
+            QueryResponse::Answer(resolved_ip_addr) => return resolved_ip_addr,
             QueryResponse::Additional(next_name_server) => next_name_server.to_owned(),
             QueryResponse::Authority(ns_domain) => resolve(&ns_domain, TYPE_A),
         };
