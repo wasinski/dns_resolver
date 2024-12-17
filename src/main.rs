@@ -3,9 +3,12 @@ use std::env;
 use crate::dns::TYPE_A;
 use crate::resolver::resolve;
 mod dns;
+mod error;
 mod resolver;
 
-fn main() {
+pub use self::error::{Error, Result};
+
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     let domain_name = match &args.as_slice() {
@@ -13,7 +16,9 @@ fn main() {
         _ => panic!("improper arguments"),
     };
 
-    let result_ip_address = resolve(domain_name, TYPE_A);
+    let result_ip_address = resolve(domain_name, TYPE_A)?;
 
-    dbg!(result_ip_address);
+    println!("Resolved IP address: {}", result_ip_address);
+
+    Ok(())
 }

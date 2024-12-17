@@ -1,5 +1,7 @@
 use rand::Rng;
 
+use crate::Result;
+
 pub const TYPE_A: u16 = 1;
 pub const TYPE_NS: u16 = 2;
 
@@ -8,7 +10,7 @@ pub struct IPv4([u8; 4]);
 
 impl std::str::FromStr for IPv4 {
     type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('.').collect();
 
         if parts.len() != 4 {
@@ -38,14 +40,14 @@ impl From<IPv4> for String {
 
 impl TryFrom<&str> for IPv4 {
     type Error = &'static str;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         value.parse()
     }
 }
 
 impl TryFrom<Vec<u8>> for IPv4 {
     type Error = &'static str;
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<u8>) -> std::result::Result<Self, Self::Error> {
         if value.len() != 4 {
             return Err("incorrect length of IPv4 address");
         }
@@ -342,51 +344,51 @@ impl DnsPacket {
         }
     }
 
-    pub fn parse_ip_address(&self) -> String {
+    pub fn parse_ip_address(&self) -> Result<String> {
         if let Some(record) = self
             .answers
             .iter()
             .find(|r| matches!(r.parsed_data, ParsedData::IpAddr(_)))
         {
             if let ParsedData::IpAddr(addr) = &record.parsed_data {
-                addr.to_string()
+                Ok(addr.to_string())
             } else {
-                panic!("type A record not found")
+                Err("type A record not found".into())
             }
         } else {
-            panic!("type A record not found")
+            Err("type A record not found".into())
         }
     }
 
-    pub fn parse_next_name_server_ip(&self) -> String {
+    pub fn parse_next_name_server_ip(&self) -> Result<String> {
         if let Some(record) = self
             .additionals
             .iter()
             .find(|r| matches!(r.parsed_data, ParsedData::IpAddr(_)))
         {
             if let ParsedData::IpAddr(addr) = &record.parsed_data {
-                addr.to_string()
+                Ok(addr.to_string())
             } else {
-                panic!("type A record not found")
+                Err("type A record not found".into())
             }
         } else {
-            panic!("type A record not found")
+            Err("type A record not found".into())
         }
     }
 
-    pub fn parse_next_name_server_domain(&self) -> String {
+    pub fn parse_next_name_server_domain(&self) -> Result<String> {
         if let Some(record) = self
             .authorities
             .iter()
             .find(|r| matches!(r.parsed_data, ParsedData::DomainName(_)))
         {
             if let ParsedData::DomainName(name) = &record.parsed_data {
-                name.0.clone()
+                Ok(name.0.clone())
             } else {
-                panic!("type NS record not found")
+                Err("type NS record not found".into())
             }
         } else {
-            panic!("type NS record not found")
+            Err("type NS record not found".into())
         }
     }
 }
